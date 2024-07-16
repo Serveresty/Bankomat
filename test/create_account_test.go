@@ -2,32 +2,35 @@ package test
 
 import (
 	"Bankomat/internal/handlers"
+	"Bankomat/internal/services"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/gorilla/mux"
 )
 
 func TestCreateAccount(t *testing.T) {
-	r := mux.NewRouter()
-	handlers.RegisterHandlers(r)
-
-	req, err := http.NewRequest("POST", "/accounts", nil)
+	go services.SetupWorkers(1)
+	req1, err := http.NewRequest("POST", "/accounts", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	rr := httptest.NewRecorder()
-	r.ServeHTTP(rr, req)
+	rr1 := httptest.NewRecorder()
+	handlers.CreateAccountHandler(rr1, req1)
 
-	if status := rr.Code; status != http.StatusCreated {
+	if rr1.Code != http.StatusCreated {
 		t.Errorf("handler returned wrong status code: got %v want %v",
-			status, http.StatusCreated)
+			rr1.Code, http.StatusCreated)
 	}
 
-	if rr.Body.String() == "" {
+	if rr1.Body.String() == "" {
 		t.Errorf("handler returned unexpected body: got %v want non-empty",
-			rr.Body.String())
+			rr1.Body.String())
+	}
+
+	acc, err := services.GetAccount(rr1.Body.String())
+	t.Logf("Account : %v", acc)
+	if err != nil {
+		t.Errorf("ACC not found: %s", err.Error())
 	}
 }

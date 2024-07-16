@@ -11,5 +11,5 @@ type BankAccount interface {
 type Account struct {
 	ID      string
 	Balance float64
-	Mutex   sync.Mutex
+	mtx     sync.Mutex
 }

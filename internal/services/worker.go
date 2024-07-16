@@ -17,20 +17,21 @@ type BalanceRequest struct {
 	Result chan float64
 }
 
-var accounts = make(map[string]*Account)
-var accountsMutex = sync.Mutex{}
+var (
+	accounts      = make(map[string]*Account)
+	accountsMutex sync.Mutex
+)
 
 var depositChan = make(chan Request)
 var withdrawChan = make(chan Request)
 var balanceChan = make(chan BalanceRequest)
-var createAccChan = make(chan BalanceRequest)
 
 func CreateAccount() string {
 	id := strconv.Itoa(len(accounts) + 1)
 	account := NewAccount(id)
 	accountsMutex.Lock()
+	defer accountsMutex.Unlock()
 	accounts[id] = account
-	accountsMutex.Unlock()
 	return id
 }
 
@@ -73,36 +74,30 @@ func worker() {
 		select {
 		case req := <-depositChan:
 			go func(r Request) {
-				accountsMutex.Lock()
-				account, exists := accounts[r.ID]
-				accountsMutex.Unlock()
-				if !exists {
-					r.Result <- fmt.Errorf("account not found")
+				acc, err := GetAccount(r.ID)
+				if err != nil {
+					r.Result <- err
 					return
 				}
-				r.Result <- account.Deposit(r.Amount)
+				r.Result <- acc.Deposit(r.Amount)
 			}(req)
 		case req := <-withdrawChan:
 			go func(r Request) {
-				accountsMutex.Lock()
-				account, exists := accounts[r.ID]
-				accountsMutex.Unlock()
-				if !exists {
-					r.Result <- fmt.Errorf("account not found")
+				acc, err := GetAccount(r.ID)
+				if err != nil {
+					r.Result <- err
 					return
 				}
-				r.Result <- account.Withdraw(r.Amount)
+				r.Result <- acc.Withdraw(r.Amount)
 			}(req)
 		case req := <-balanceChan:
 			go func(r BalanceRequest) {
-				accountsMutex.Lock()
-				account, exists := accounts[r.ID]
-				accountsMutex.Unlock()
-				if !exists {
+				acc, err := GetAccount(r.ID)
+				if err != nil {
 					r.Result <- 0
 					return
 				}
-				r.Result <- account.GetBalance()
+				r.Result <- acc.GetBalance()
 			}(req)
 		}
 	}
